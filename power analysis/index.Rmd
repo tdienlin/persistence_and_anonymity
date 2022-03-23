@@ -1,0 +1,12 @@
+---
+title: "The effects of persistence and identifiability on online communication"
+---
+
+
+On this website, you can find the companion material for the paper _The effects of persistence and identifiability on online communication_. 
+
+You can find the following information here:
+
+- The [power analyses](power_analysis.html).
+
+This website is produced directly from the project's [github repository](https://github.com/tdienlin/Persistence_Identification). You can download the material and the data, file an issue, or submit a pull request.

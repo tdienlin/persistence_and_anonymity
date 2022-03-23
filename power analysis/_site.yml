@@ -1,0 +1,15 @@
+name: "Persistence and Identification"
+output_dir: "."
+navbar:
+  title: "Home"
+  type: inverse
+  left:
+    - text: "Power Analyses"
+      href: power_analysis.html
+  right:
+    - text: "Source Code"
+      icon: fa-lg fa-github
+      href: https://github.com/tdienlin/Persistence_Identification
+output:
+  html_document:
+    theme: cosmo
