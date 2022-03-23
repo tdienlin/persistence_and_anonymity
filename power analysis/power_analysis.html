@@ -474,12 +474,12 @@ sd_est &lt;- 1</code></pre>
   summarize(mean = mean(words), .groups = &#39;drop&#39;)
 means</code></pre>
 <pre><code>## # A tibble: 4 × 3
-##   persistence identification     mean
-##         &lt;dbl&gt;          &lt;dbl&gt;    &lt;dbl&gt;
-## 1           0              0 -0.00882
-## 2           0              1 -0.197  
-## 3           1              0 -0.0403 
-## 4           1              1 -0.453</code></pre>
+##   persistence identification    mean
+##         &lt;dbl&gt;          &lt;dbl&gt;   &lt;dbl&gt;
+## 1           0              0 -0.0514
+## 2           0              1 -0.237 
+## 3           1              0 -0.257 
+## 4           1              1 -0.568</code></pre>
 <p>Sample size small and single study, but general tendency seems to be alright.</p>
 <p>Let’s also quickly run regression.</p>
 <pre class="r"><code>lm(words ~ persistence + identification, d) %&gt;% 
@@ -489,20 +489,20 @@ means</code></pre>
 ## lm(formula = words ~ persistence + identification, data = d)
 ## 
 ## Residuals:
-##      Min       1Q   Median       3Q      Max 
-## -2.74332 -0.67846 -0.01185  0.69900  2.59851 
+##     Min      1Q  Median      3Q     Max 
+## -2.9286 -0.6928 -0.0771  0.7193  2.9894 
 ## 
 ## Coefficients:
-##                Estimate Std. Error t value      Pr(&gt;|t|)    
-## (Intercept)     0.04731    0.04506   1.050       0.29392    
-## persistence    -0.14374    0.05203  -2.763       0.00581 ** 
-## identification -0.30054    0.05203  -5.776 0.00000000934 ***
+##                Estimate Std. Error t value   Pr(&gt;|t|)    
+## (Intercept)    -0.01996    0.04669  -0.428      0.669    
+## persistence    -0.26851    0.05391  -4.981 0.00000071 ***
+## identification -0.24851    0.05391  -4.610 0.00000439 ***
 ## ---
 ## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
 ## 
-## Residual standard error: 0.9872 on 1437 degrees of freedom
-## Multiple R-squared:  0.02774,    Adjusted R-squared:  0.02639 
-## F-statistic:  20.5 on 2 and 1437 DF,  p-value: 0.000000001667</code></pre>
+## Residual standard error: 1.023 on 1437 degrees of freedom
+## Multiple R-squared:  0.03105,    Adjusted R-squared:  0.02971 
+## F-statistic: 23.03 on 2 and 1437 DF,  p-value: 0.0000000001432</code></pre>
 <p>Results look reasonable. Both persistence and identification reduce disclosure.</p>
 </div>
 <div id="power-analysis" class="section level1">
@@ -537,8 +537,8 @@ sims</code></pre>
 <p><img src="power_analysis_files/figure-html/unnamed-chunk-11-1.png" width="672" /></p>
 <p>We compute average effect size.</p>
 <pre class="r"><code>apply(sims[c(&quot;per0_ide0_m&quot;, &quot;per0_ide1_m&quot;, &quot;per1_ide0_m&quot;, &quot;per1_ide1_m&quot;)], 2, mean)</code></pre>
-<pre><code>##  per0_ide0_m  per0_ide1_m  per1_ide0_m  per1_ide1_m 
-## -0.003559893 -0.202056583 -0.197057465 -0.399849369</code></pre>
+<pre><code>##   per0_ide0_m   per0_ide1_m   per1_ide0_m   per1_ide1_m 
+##  0.0001110155 -0.1975263171 -0.2080526746 -0.3991319793</code></pre>
 <p>We compute power.</p>
 <pre class="r"><code>power &lt;- data.frame(
   persistence = sum(sims$persistence_p &lt; .05 &amp; sims$persistence_est &lt; 0) / n_sim,
@@ -546,7 +546,7 @@ sims</code></pre>
 )
 print(power)</code></pre>
 <pre><code>##   persistence identification
-## 1        0.86          0.846</code></pre>
+## 1       0.859          0.821</code></pre>
 </div>
 
 
