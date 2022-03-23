@@ -1,10 +1,10 @@
 ---
 title: "Power Analysis"
 author: "Tobias Dienlin"
-output: rmarkdown::github_document
-  # html_document:
-  #   df_print: paged
-  #    code_folding: hide
+output: 
+  github_document:
+    toc: true
+    toc_depth: 2
 ---
 
 ```{r setup, include=FALSE}
@@ -24,7 +24,7 @@ library(tidyverse)
 
 Here, I run some power analysis for a study on online political participation. 
 In the study, people use a social networking site (discord) on which they discuss political matters. 
-On discord, people will participate in a group of 20 people (medium scale group communication).
+Participants will communicate in groups of 20 people each (medium scale group communication).
 The dependent variable is how much people discuss (measured via _number of words_).
 We're interested how different SNS designs affect communication.
 
