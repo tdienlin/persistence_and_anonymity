@@ -4,12 +4,17 @@ Tobias Dienlin
 
 -   [Background](#background)
 -   [Custom functions](#custom-functions)
--   [Define study design and sample
-    size](#define-study-design-and-sample-size)
--   [Create data frame](#create-data-frame)
+-   [Study Design](#study-design)
 -   [Define effect size](#define-effect-size)
 -   [Test run](#test-run)
+    -   [Set-up](#set-up)
+    -   [Simulate data](#simulate-data)
+    -   [Analyse data](#analyse-data)
 -   [Power analysis](#power-analysis)
+    -   [Visualization](#visualization)
+    -   [Cell means & main effects](#cell-means--main-effects)
+    -   [Power Estimates](#power-estimates)
+-   [Next steps](#next-steps)
 
 ``` r
 library(broom)
@@ -20,7 +25,7 @@ library(tidyverse)
 
 # Background
 
-Here, I run some power analysis for a study on online political
+Here, we run some power analysis for a study on online political
 participation. In the study, people use a social networking site
 (discord) on which they discuss political matters. Participants will
 communicate in groups of 20 people each (medium scale group
@@ -130,6 +135,7 @@ analyze_d <- function(object, ...) {
   
   # combine result
   results <- data.frame(
+    reps = repetition_n,
     per0_ide0_m = filter(means, persistence == 0, identification == 0)$mean,
     per0_ide1_m = filter(means, persistence == 0, identification == 1)$mean,
     per1_ide0_m = filter(means, persistence == 1, identification == 0)$mean,
@@ -148,14 +154,31 @@ des_sim_fit <- function(...){
   # function to report and extract results
   
   d_frame <- generate_design(...)
-  # words <- sim_d(d_frame, ...)
-  # d <- cbind(d_frame, words)
   d <- sim_d(d_frame, ...)
   analyze_d(d)
 }
+
+est_pow <- function(n_sim = 1000, ...){
+  # function to run analyse n_sim times
+
+  tibble(sim = 1:n_sim) %>% 
+  mutate(
+    effect = map(sim, 
+                 des_sim_fit, 
+                 groupsize = groupsize_n, 
+                 persis = persis_n, 
+                 ident = ident_n, 
+                 topics = topics_n, 
+                 repetition = repetition_n, 
+                 effects = effects_est, 
+                 sd = sd_est)
+    ) %>%
+  unnest(effect) %>%
+  as.data.frame()
+}
 ```
 
-# Define study design and sample size
+# Study Design
 
 ``` r
 # study design
@@ -163,10 +186,9 @@ groupsize_n   <- 20
 persis_n      <- 2
 ident_n       <- 2 
 topics_n      <- 3
-repetition_n  <- 6
 
-# overall sample size
-sample_size <- groupsize_n * persis_n * ident_n * topics_n * repetition_n
+# minimum sample size
+sample_size <- groupsize_n * persis_n * ident_n * topics_n
 ```
 
 We define our study design as follows:
@@ -175,39 +197,15 @@ We define our study design as follows:
 -   2 persistence conditions
 -   2 identification conditions
 -   3 different topics to be discussed
--   6 repetitions of this set-up
--   1440 overall sample size
-
-# Create data frame
-
-We then create an empty data frame, in which we will then later simulate
-the data.
-
-``` r
-# create design frame
-d_frame <- generate_design(
-  groupsize  = groupsize_n,
-  persis     = persis_n,  
-  ident      = ident_n,     
-  topics     = topics_n,  
-  repetition = repetition_n
-  )
-d_frame
-```
-
-Check if data-frame is alright.
-
-``` r
-xtabs(~persistence + identification + topic + repetition, d_frame)
-```
-
-Allocation of participants to experimental groups worked just fine.
+-   240 minimum sample size
 
 # Define effect size
 
-We first need to define likely effects. We assume normal distribution, a
-mean of zero and a standard deviation of one. We can hence think of
-effects in terms of Cohen’s d: .2 = small, .5 = medium, and .8 = large.
+We then need to define likely effects. Problem is, we don’t have good
+estimates of actual, raw date. To simplify, we assume normal
+distribution, a mean of zero and a standard deviation of one. We can
+hence think of effects in terms of Cohen’s d: .2 = small, .5 = medium,
+and .8 = large.
 
 |              | persistent | ephemeral |
 |--------------|:----------:|:---------:|
@@ -229,11 +227,47 @@ sd_est <- 1
 
 # Test run
 
+To see if our functions work, let’s make a test run with only one
+repetition.
+
+``` r
+repetition_n <- 1
+```
+
+## Set-up
+
+We first create an empty data frame, in which we will then later
+simulate the data.
+
+``` r
+# create design frame
+d_frame <- generate_design(
+  groupsize  = groupsize_n,
+  persis     = persis_n,  
+  ident      = ident_n,     
+  topics     = topics_n,  
+  repetition = repetition_n
+  )
+d_frame
+```
+
+Check if data-frame is alright.
+
+``` r
+xtabs(~persistence + identification + topic + repetition, d_frame)
+```
+
+Allocation of participants to experimental groups worked just fine.
+
+## Simulate data
+
 Let’s create a single data-set and analyze it.
 
 ``` r
 d <- sim_d(d_frame, seed = 1, effects_est, sd_est, groupsize_n)
 ```
+
+## Analyse data
 
 Let’s check if means were created alright:
 
@@ -247,15 +281,15 @@ means
     ## # A tibble: 4 × 3
     ##   persistence identification    mean
     ##         <dbl>          <dbl>   <dbl>
-    ## 1           0              0  0.0367
-    ## 2           0              1 -0.266 
-    ## 3           1              0 -0.461 
-    ## 4           1              1 -0.322
+    ## 1           0              0  0.191 
+    ## 2           0              1 -0.206 
+    ## 3           1              0 -0.0612
+    ## 4           1              1 -0.298
 
 Sample size small and single study, but general tendency seems to be
 alright.
 
-Let’s also quickly run regression.
+Let’s also quickly run a regression.
 
 ``` r
 lm(words ~ persistence + identification, d) %>% 
@@ -268,88 +302,150 @@ lm(words ~ persistence + identification, d) %>%
     ## 
     ## Residuals:
     ##      Min       1Q   Median       3Q      Max 
-    ## -2.98287 -0.68819  0.03238  0.64810  2.47407 
+    ## -2.36524 -0.52025  0.02285  0.55831  2.33986 
     ## 
     ## Coefficients:
-    ##                Estimate Std. Error t value     Pr(>|t|)    
-    ## (Intercept)    -0.07384    0.04421  -1.670       0.0951 .  
-    ## persistence    -0.27635    0.05105  -5.413 0.0000000725 ***
-    ## identification -0.08202    0.05105  -1.607       0.1084    
+    ##                Estimate Std. Error t value Pr(>|t|)   
+    ## (Intercept)      0.1505     0.1005   1.498  0.13543   
+    ## persistence     -0.1718     0.1160  -1.480  0.14013   
+    ## identification  -0.3170     0.1160  -2.732  0.00676 **
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Residual standard error: 0.9687 on 1437 degrees of freedom
-    ## Multiple R-squared:  0.0217, Adjusted R-squared:  0.02034 
-    ## F-statistic: 15.94 on 2 and 1437 DF,  p-value: 0.0000001421
+    ## Residual standard error: 0.8988 on 237 degrees of freedom
+    ## Multiple R-squared:  0.03915,    Adjusted R-squared:  0.03104 
+    ## F-statistic: 4.828 on 2 and 237 DF,  p-value: 0.008805
 
 Results look reasonable. Both persistence and identification reduce
 disclosure.
 
 # Power analysis
 
+Let’s next run our actual power analysis.
+
 ``` r
 n_sim <- 1000
+n_reps <- 10
 ```
 
-We run a power analysis with 1000 simulations.
+We run a power analysis with 1000 simulations per design. We test 10
+designs, that is 1 to 10 repetitions.
 
 ``` r
-sims <-
-  tibble(sim = 1:n_sim) %>% 
-  mutate(
-    effect = map(sim, 
-                 des_sim_fit, 
-                 groupsize = groupsize_n, 
-                 persis = persis_n, 
-                 ident = ident_n, 
-                 topics = topics_n, 
-                 repetition = repetition_n, 
-                 effects = effects_est, 
-                 sd = sd_est)
-    ) %>%
-  unnest(effect) %>%
-  as.data.frame()
-sims
+# create empy data frame
+columns <- c("sim", "reps", "per0_ide0_m", "per0_ide1_m", 
+             "per1_ide0_m", "per1_ide1_m", "persistence_est", 
+             "persistence_p", "identification_est", "identification_p", "n")
+sims <- data.frame(matrix(nrow = 0, ncol = length(columns))) 
+colnames(sims) = columns
+
+for(i in 1 : n_reps){
+  repetition_n  <- i
+  sims <- rbind(sims, est_pow())
+}
 ```
 
-We visualize the results. First persistence:
+## Visualization
 
-``` r
-ggplot(sims) +
-  geom_point(aes(sim, persistence_est, color = persistence_p < .05)) + 
-  scale_color_manual(values = c("grey", "blue2"))
-```
-
-![](README_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
-
-Then identification.
+Let’s inspect the results. First persistence:
 
 ``` r
 ggplot(sims) +
-  geom_point(aes(sim, identification_est, color = identification_p < .05)) + 
-  scale_color_manual(values = c("grey", "blue2"))
+  geom_point(aes(sim, persistence_est, color = persistence_p < .05), 
+             size = .2, alpha = .5) + 
+  scale_color_manual(values = c("darkgrey", "blue")) +
+  facet_wrap(facets = "reps")
 ```
 
 ![](README_files/figure-gfm/unnamed-chunk-11-1.png)<!-- -->
 
-We compute average effect size.
+Shows that with more repetitions, effect size move closer to actual
+population value.
+
+To make sure, let’s next check identification – should provide identical
+results.
 
 ``` r
-apply(sims[c("per0_ide0_m", "per0_ide1_m", "per1_ide0_m", "per1_ide1_m")], 2, mean)
+ggplot(sims) +
+  geom_point(aes(sim, identification_est, color = identification_p < .05), 
+             size = .2, alpha = .5) + 
+  scale_color_manual(values = c("darkgrey", "blue")) +
+  facet_wrap(facets = "reps")
 ```
 
-    ##  per0_ide0_m  per0_ide1_m  per1_ide0_m  per1_ide1_m 
-    ## -0.003814731 -0.199495697 -0.201797552 -0.398360920
+![](README_files/figure-gfm/unnamed-chunk-12-1.png)<!-- -->
 
-We compute power.
+Looks good.
+
+## Cell means & main effects
+
+Next, we compute the average means in the four cells averaged across
+simulations, plus the two main effects. This is more of a sanity check
+to see if our population values can be reproduced.
 
 ``` r
-power <- data.frame(
-  persistence = sum(sims$persistence_p < .05 & sims$persistence_est < 0) / n_sim,
-  identification = sum(sims$identification_p < .05 & sims$identification_est < 0) / n_sim
-)
-print(power)
+sims %>% 
+  group_by(reps) %>% 
+  summarise(per0_ide0 = mean(per0_ide0_m),
+            per0_ide1 = mean(per0_ide1_m),
+            per1_ide0 = mean(per1_ide0_m),
+            per1_ide1 = mean(per1_ide1_m),
+            persistence = mean(persistence_est), 
+            identification = mean(identification_est)
+            )
 ```
 
-    ##   persistence identification
-    ## 1        0.85          0.847
+    ## # A tibble: 10 × 7
+    ##     reps  per0_ide0 per0_ide1 per1_ide0 per1_ide1 persistence identification
+    ##    <int>      <dbl>     <dbl>     <dbl>     <dbl>       <dbl>          <dbl>
+    ##  1     1 -0.00326      -0.205    -0.200    -0.401      -0.196         -0.202
+    ##  2     2 -0.00340      -0.198    -0.200    -0.398      -0.198         -0.197
+    ##  3     3 -0.000849     -0.199    -0.204    -0.397      -0.201         -0.196
+    ##  4     4 -0.0000881    -0.198    -0.204    -0.402      -0.204         -0.198
+    ##  5     5  0.00397      -0.192    -0.200    -0.402      -0.207         -0.199
+    ##  6     6 -0.00370      -0.201    -0.200    -0.404      -0.199         -0.201
+    ##  7     7  0.00707      -0.200    -0.199    -0.403      -0.204         -0.205
+    ##  8     8  0.00232      -0.200    -0.206    -0.400      -0.205         -0.198
+    ##  9     9  0.00387      -0.198    -0.202    -0.401      -0.204         -0.201
+    ## 10    10 -0.000569     -0.198    -0.198    -0.403      -0.201         -0.202
+
+Shows that the means resemble those we defined a priori. Same for main
+effects.
+
+## Power Estimates
+
+Now, let’s compute power for each number of replication.
+
+``` r
+sims %>% 
+  group_by(reps) %>% 
+  summarise(persistence = sum(persistence_p < .05 & persistence_est < 0) / n_sim,
+            identification = sum(identification_p < .05 & identification_est < 0) / n_sim,
+            n = max(n))
+```
+
+    ## # A tibble: 10 × 4
+    ##     reps persistence identification     n
+    ##    <int>       <dbl>          <dbl> <int>
+    ##  1     1       0.391          0.419   240
+    ##  2     2       0.543          0.559   480
+    ##  3     3       0.661          0.644   720
+    ##  4     4       0.756          0.733   960
+    ##  5     5       0.833          0.802  1200
+    ##  6     6       0.866          0.837  1440
+    ##  7     7       0.897          0.901  1680
+    ##  8     8       0.931          0.909  1920
+    ##  9     9       0.947          0.938  2160
+    ## 10    10       0.956          0.954  2400
+
+If we replicate the study at least 5 times, then we get more than 80%
+power.
+
+# Next steps
+
+-   Run power analysis for Bayes Factors comparing different hypotheses
+-   Simulate new data with unstandardized results
+-   Simulate new data with more realistic distribution; i.e.,
+    zero-inflated beta/gamma distribution.
+-   Analyze data using mixed effects model
+-   Simulate data with hierarchical structure

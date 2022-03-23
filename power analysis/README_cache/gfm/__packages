@@ -1,0 +1,12 @@
+base
+broom
+ggplot2
+magrittr
+tidyverse
+tibble
+tidyr
+readr
+purrr
+dplyr
+stringr
+forcats
