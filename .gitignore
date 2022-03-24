@@ -2,6 +2,7 @@
 .Rhistory
 .RData
 .Ruserdata
+.DS_Store
 power analysis/archive/
 power analysis/README_cache/
 power analysis/README_files/
