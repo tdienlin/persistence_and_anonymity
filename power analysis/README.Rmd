@@ -33,6 +33,7 @@ The study design is as follows:
  - The website is experimentally manipulated (2 x 2 design). 
  - First, the _persistence_ of the comments is manipulated (permanent vs. ephemeral), as well as _identification_ (identifiable vs. anonymous).
  - To increase generalizability, the groups will discuss one of three _topics_: corona politics, environment, gender.
+ - All is between-person
 
 So these are 2 (identification) x 2 (persistence) experimental factors and a 3-way generalization factor (topic), resulting in a minimum of 12 groups.
 Hence, the minimum sample size 12 x 20 = 240 participants.
@@ -273,9 +274,9 @@ lm(words ~ persistence + identification, d) %>%
 
 Results look reasonable. Both persistence and identification reduce disclosure.
 
-# Power analysis
+# Power analysis 1
 
-Let's next run our actual power analysis.
+Let's next run our actual power analysis, using the effect sizes defined above (small standardized effects).
 
 ```{r}
 n_sim <- 1000
@@ -348,13 +349,123 @@ Shows that the means resemble those we defined a priori. Same for main effects.
 Now, let's compute power for each number of replication.
 
 ```{r}
-sims %>% 
+power <- sims %>% 
   group_by(reps) %>% 
   summarise(persistence = sum(persistence_p < .05 & persistence_est < 0) / n_sim,
             identification = sum(identification_p < .05 & identification_est < 0) / n_sim,
             n = max(n))
+print(power)
 ```
+
+```{r}
+dat <- power %>% pivot_longer(c(-reps, -n), names_to = "manipulation", values_to = "effect")
+power_fig <- ggplot(dat, aes(reps, effect, color = manipulation)) +
+  geom_point(alpha = .9) +
+  scale_x_discrete(limits = c(1:10))
+power_fig
+```
+
+
 If we replicate the study at least 5 times, then we get more than 80% power.
+
+# Power analysis 2
+
+Let's next run our power analysis, using slightly larger effect sized (small to medium).
+
+```{r}
+pers0_iden_0_m <- 0
+pers0_iden_1_m <- -.3
+pers1_iden_0_m <- -.3
+pers1_iden_1_m <- -.6
+effects_est <- c(pers0_iden_0_m, pers0_iden_1_m, pers1_iden_0_m, pers1_iden_1_m)
+names(effects_est) <- c("pers0_iden_0_m", "pers0_iden_1_m", "pers1_iden_0_m", "pers1_iden_1_m")
+sd_est <- 1
+```
+
+We run a power analysis with `r n_sim` simulations per design. We test 10 designs, that is 1 to `r n_reps` repetitions.
+
+```{r results='hide'}
+# create empy data frame
+columns <- c("sim", "reps", "per0_ide0_m", "per0_ide1_m", 
+             "per1_ide0_m", "per1_ide1_m", "persistence_est", 
+             "persistence_p", "identification_est", "identification_p", "n")
+sims <- data.frame(matrix(nrow = 0, ncol = length(columns))) 
+colnames(sims) = columns
+
+for(i in 1 : n_reps){
+  repetition_n  <- i
+  sims <- rbind(sims, est_pow())
+}
+```
+
+## Visualization
+
+Let's inspect the results. First persistence:
+
+```{r}
+ggplot(sims) +
+  geom_point(aes(sim, persistence_est, color = persistence_p < .05), 
+             size = .2, alpha = .5) + 
+  scale_color_manual(values = c("darkgrey", "blue")) +
+  facet_wrap(facets = "reps")
+```
+
+Shows that with more repetitions, effect size move closer to actual population value.
+
+To make sure, let's next check identification -- should provide identical results.
+
+```{r}
+ggplot(sims) +
+  geom_point(aes(sim, identification_est, color = identification_p < .05), 
+             size = .2, alpha = .5) + 
+  scale_color_manual(values = c("darkgrey", "blue")) +
+  facet_wrap(facets = "reps")
+```
+
+Looks good. 
+
+## Cell means & main effects
+
+Next, we compute the average means in the four cells averaged across simulations, plus the two main effects.
+This is more of a sanity check to see if our population values can be reproduced.
+
+```{r}
+sims %>% 
+  group_by(reps) %>% 
+  summarise(per0_ide0 = mean(per0_ide0_m),
+            per0_ide1 = mean(per0_ide1_m),
+            per1_ide0 = mean(per1_ide0_m),
+            per1_ide1 = mean(per1_ide1_m),
+            persistence = mean(persistence_est), 
+            identification = mean(identification_est)
+            )
+```
+
+Shows that the means resemble those we defined a priori. Same for main effects.
+
+## Power Estimates
+
+Now, let's compute power for each number of replication.
+
+```{r}
+power <- sims %>% 
+  group_by(reps) %>% 
+  summarise(persistence = sum(persistence_p < .05 & persistence_est < 0) / n_sim,
+            identification = sum(identification_p < .05 & identification_est < 0) / n_sim,
+            n = max(n))
+print(power)
+```
+
+If we replicate the study at least 3 times, then we get more than 80% power.
+
+```{r}
+dat <- power %>% pivot_longer(c(-reps, -n), names_to = "manipulation", values_to = "effect")
+power_fig <- ggplot(dat, aes(reps, effect, color = manipulation)) +
+  geom_point(alpha = .9) +
+  scale_x_discrete(limits = c(1:10))
+power_fig
+```
+
 
 # Next steps
 

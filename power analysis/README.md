@@ -10,10 +10,14 @@ Tobias Dienlin
     -   [Set-up](#set-up)
     -   [Simulate data](#simulate-data)
     -   [Analyse data](#analyse-data)
--   [Power analysis](#power-analysis)
+-   [Power analysis 1](#power-analysis-1)
     -   [Visualization](#visualization)
     -   [Cell means & main effects](#cell-means--main-effects)
     -   [Power Estimates](#power-estimates)
+-   [Power analysis 2](#power-analysis-2)
+    -   [Visualization](#visualization-1)
+    -   [Cell means & main effects](#cell-means--main-effects-1)
+    -   [Power Estimates](#power-estimates-1)
 -   [Next steps](#next-steps)
 
 ``` r
@@ -319,9 +323,10 @@ lm(words ~ persistence + identification, d) %>%
 Results look reasonable. Both persistence and identification reduce
 disclosure.
 
-# Power analysis
+# Power analysis 1
 
-Let’s next run our actual power analysis.
+Let’s next run our actual power analysis, using the effect sizes defined
+above (small standardized effects).
 
 ``` r
 n_sim <- 1000
@@ -417,11 +422,12 @@ effects.
 Now, let’s compute power for each number of replication.
 
 ``` r
-sims %>% 
+power <- sims %>% 
   group_by(reps) %>% 
   summarise(persistence = sum(persistence_p < .05 & persistence_est < 0) / n_sim,
             identification = sum(identification_p < .05 & identification_est < 0) / n_sim,
             n = max(n))
+print(power)
 ```
 
     ## # A tibble: 10 × 4
@@ -438,8 +444,169 @@ sims %>%
     ##  9     9       0.947          0.938  2160
     ## 10    10       0.956          0.954  2400
 
+``` r
+dat <- power %>% pivot_longer(c(-reps, -n), names_to = "manipulation", values_to = "effect")
+power_fig <- ggplot(dat, aes(reps, effect, color = manipulation)) +
+  geom_point(alpha = .9) +
+  scale_x_discrete(limits = c(1:10))
+```
+
+    ## Warning: Continuous limits supplied to discrete scale.
+    ## Did you mean `limits = factor(...)` or `scale_*_continuous()`?
+
+``` r
+power_fig
+```
+
+![](README_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
+
 If we replicate the study at least 5 times, then we get more than 80%
 power.
+
+# Power analysis 2
+
+Let’s next run our power analysis, using slightly larger effect sized
+(small to medium).
+
+``` r
+pers0_iden_0_m <- 0
+pers0_iden_1_m <- -.3
+pers1_iden_0_m <- -.3
+pers1_iden_1_m <- -.6
+effects_est <- c(pers0_iden_0_m, pers0_iden_1_m, pers1_iden_0_m, pers1_iden_1_m)
+names(effects_est) <- c("pers0_iden_0_m", "pers0_iden_1_m", "pers1_iden_0_m", "pers1_iden_1_m")
+sd_est <- 1
+```
+
+We run a power analysis with 1000 simulations per design. We test 10
+designs, that is 1 to 10 repetitions.
+
+``` r
+# create empy data frame
+columns <- c("sim", "reps", "per0_ide0_m", "per0_ide1_m", 
+             "per1_ide0_m", "per1_ide1_m", "persistence_est", 
+             "persistence_p", "identification_est", "identification_p", "n")
+sims <- data.frame(matrix(nrow = 0, ncol = length(columns))) 
+colnames(sims) = columns
+
+for(i in 1 : n_reps){
+  repetition_n  <- i
+  sims <- rbind(sims, est_pow())
+}
+```
+
+## Visualization
+
+Let’s inspect the results. First persistence:
+
+``` r
+ggplot(sims) +
+  geom_point(aes(sim, persistence_est, color = persistence_p < .05), 
+             size = .2, alpha = .5) + 
+  scale_color_manual(values = c("darkgrey", "blue")) +
+  facet_wrap(facets = "reps")
+```
+
+![](README_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->
+
+Shows that with more repetitions, effect size move closer to actual
+population value.
+
+To make sure, let’s next check identification – should provide identical
+results.
+
+``` r
+ggplot(sims) +
+  geom_point(aes(sim, identification_est, color = identification_p < .05), 
+             size = .2, alpha = .5) + 
+  scale_color_manual(values = c("darkgrey", "blue")) +
+  facet_wrap(facets = "reps")
+```
+
+![](README_files/figure-gfm/unnamed-chunk-19-1.png)<!-- -->
+
+Looks good.
+
+## Cell means & main effects
+
+Next, we compute the average means in the four cells averaged across
+simulations, plus the two main effects. This is more of a sanity check
+to see if our population values can be reproduced.
+
+``` r
+sims %>% 
+  group_by(reps) %>% 
+  summarise(per0_ide0 = mean(per0_ide0_m),
+            per0_ide1 = mean(per0_ide1_m),
+            per1_ide0 = mean(per1_ide0_m),
+            per1_ide1 = mean(per1_ide1_m),
+            persistence = mean(persistence_est), 
+            identification = mean(identification_est)
+            )
+```
+
+    ## # A tibble: 10 × 7
+    ##     reps  per0_ide0 per0_ide1 per1_ide0 per1_ide1 persistence identification
+    ##    <int>      <dbl>     <dbl>     <dbl>     <dbl>       <dbl>          <dbl>
+    ##  1     1  0.00595      -0.298    -0.304    -0.614      -0.313         -0.307
+    ##  2     2 -0.00199      -0.293    -0.297    -0.597      -0.300         -0.296
+    ##  3     3 -0.00497      -0.295    -0.302    -0.595      -0.298         -0.292
+    ##  4     4  0.00251      -0.302    -0.298    -0.602      -0.300         -0.304
+    ##  5     5 -0.00327      -0.299    -0.301    -0.598      -0.298         -0.296
+    ##  6     6  0.00225      -0.298    -0.300    -0.601      -0.303         -0.300
+    ##  7     7 -0.000581     -0.302    -0.297    -0.599      -0.297         -0.302
+    ##  8     8 -0.000324     -0.295    -0.296    -0.599      -0.300         -0.299
+    ##  9     9  0.0000172    -0.297    -0.296    -0.601      -0.300         -0.301
+    ## 10    10 -0.00280      -0.305    -0.304    -0.595      -0.296         -0.296
+
+Shows that the means resemble those we defined a priori. Same for main
+effects.
+
+## Power Estimates
+
+Now, let’s compute power for each number of replication.
+
+``` r
+power <- sims %>% 
+  group_by(reps) %>% 
+  summarise(persistence = sum(persistence_p < .05 & persistence_est < 0) / n_sim,
+            identification = sum(identification_p < .05 & identification_est < 0) / n_sim,
+            n = max(n))
+print(power)
+```
+
+    ## # A tibble: 10 × 4
+    ##     reps persistence identification     n
+    ##    <int>       <dbl>          <dbl> <int>
+    ##  1     1       0.6            0.603   240
+    ##  2     2       0.785          0.771   480
+    ##  3     3       0.867          0.886   720
+    ##  4     4       0.936          0.937   960
+    ##  5     5       0.97           0.964  1200
+    ##  6     6       0.984          0.989  1440
+    ##  7     7       0.991          0.99   1680
+    ##  8     8       0.997          0.995  1920
+    ##  9     9       0.999          0.995  2160
+    ## 10    10       0.998          0.999  2400
+
+If we replicate the study at least 3 times, then we get more than 80%
+power.
+
+``` r
+dat <- power %>% pivot_longer(c(-reps, -n), names_to = "manipulation", values_to = "effect")
+power_fig <- ggplot(dat, aes(reps, effect, color = manipulation)) +
+  geom_point(alpha = .9) +
+  scale_x_discrete(limits = c(1:10))
+```
+
+    ## Warning: Continuous limits supplied to discrete scale.
+    ## Did you mean `limits = factor(...)` or `scale_*_continuous()`?
+
+``` r
+power_fig
+```
+
+![](README_files/figure-gfm/unnamed-chunk-22-1.png)<!-- -->
 
 # Next steps
 
