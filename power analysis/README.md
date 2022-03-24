@@ -45,6 +45,7 @@ The study design is as follows:
     vs. anonymous).
 -   To increase generalizability, the groups will discuss one of three
     *topics*: corona politics, environment, gender.
+-   All is between-person
 
 So these are 2 (identification) x 2 (persistence) experimental factors
 and a 3-way generalization factor (topic), resulting in a minimum of 12
