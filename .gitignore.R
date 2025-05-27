@@ -1,0 +1,11 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+.DS_Store
+archive/
+power_analysis_cache/
+analysis_preregistered_cache/
+site_libs/.DS_Store
+analyses_cache/
+analyses_words*

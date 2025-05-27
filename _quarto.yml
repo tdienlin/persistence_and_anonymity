@@ -1,0 +1,32 @@
+project: 
+  type: website
+  output-dir: docs
+  
+website:
+  title: "Effects of persistence and anonymity on political opinion expression"
+  navbar:
+    title: "Home"
+    type: inverse
+    left:
+      - text: "Analyses"
+        href: analyses.qmd
+      - text: "Analyses Using Words"
+        href: analyses_words_new.qmd
+      - text: "Power Analysis"
+        href: power_analyses.qmd
+      - text: "Planned Analysis"
+        href: planned_analyses.qmd
+      - text: "Deviations"
+        href: deviations.qmd
+    right:
+      - text: "Source Code"
+        icon: fa-github
+        href: https://github.com/XMtRa/privacy_calc_exp_anon
+      - text: "Data"
+        icon: fa-database
+        href: https://github.com/XMtRa/persistence_anonymity_anon/blob/main/data/data.csv
+
+format:
+  html:
+    theme: cosmo
+    toc: true

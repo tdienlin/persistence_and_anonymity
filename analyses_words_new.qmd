@@ -1,0 +1,790 @@
+---
+title: "Additional analyses"
+format: 
+  html:
+    self-contained: true
+    toc: true
+    toc-float: true
+execute:
+  cache: true
+---
+
+As preregistered, below we report additional analyses for which we used the actual number of communicated words as DV.
+
+# Set-up
+## Packages
+
+```{r}
+#| message: false
+#| results: hide
+#| cache: false
+
+library(brms)
+library(ggplot2)
+library(kableExtra)
+library(lme4)
+library(lmerTest)
+library(rmarkdown)
+library(performance)
+library(see)
+library(sjmisc)
+library(tidyverse)
+
+options(
+  digits = 3
+)
+set.seed(170819)
+```
+
+## Custom functions
+
+```{r}
+# function to silence brms output
+hush <- 
+  function(
+    code
+    ){
+    sink("/dev/null")
+    tmp = code
+    sink()
+    return(tmp)
+    }
+```
+
+## Data
+
+```{r load-data}
+#| results: hide
+#| message: false
+
+d_words <- read_csv("data/DataAggregated_T1T2_nwords.csv")
+d <- read_csv("data/data.csv")
+
+# get words from dataframe
+d$n_Words <- d_words$n_Words
+
+# same as above; but original file name:
+# d <- read_csv("data/DataAggregated_T1T2_costsbenefits.csv")
+
+# load image for work in IDE
+# load("data/image_words.RData")
+
+d <- d |> 
+  rename(
+    group = roles,
+    gender = DE01_T1,
+    age = DE02_01_T1,
+    pol_stance = DE06_01_T1
+  ) |> 
+  mutate(
+    female = as.logical(2 - gender),
+    gender = factor(gender, labels = c("female", "male")),
+    n_Words = replace_na(n_Words, 0)
+  )
+
+# recode to make as sum coding
+d$anonymity_dev <- factor(d$anonymity)
+contrasts(d$anonymity_dev) <- contr.sum(2)
+d$persistence_dev <- factor(d$persistence)
+contrasts(d$persistence_dev) <- contr.sum(2)
+```
+
+# Descriptives
+
+Let's inspect distribution of words communicated.
+
+```{r}
+ggplot(d, aes(n_Words)) +
+  geom_histogram(binwidth = 50)
+```
+
+Looks like a zero-inflated poisson distribution. Confirms our preregistered approach to analyze data using zero-inflated Poisson approach.
+
+```{r}
+nrow(d[d$n_Words == 0, ]) / nrow(d)
+```
+
+Overall, 21% of participants without any written words.
+
+We first look at the experimental group's descriptives
+
+```{r}
+#| warning: false
+
+d |> 
+  group_by(persistence) |> 
+  summarize(n_Words_m = mean(n_Words)) |> 
+  as.data.frame() |> 
+  kable()
+```
+
+Looking at persistence, we see there's a slight difference among groups. Participants in the low persistence condition communicated more. 
+
+```{r}
+d |> 
+  group_by(anonymity) |> 
+  summarize(n_Words_m = mean(n_Words)) |> 
+  as.data.frame() |> 
+  kable()
+```
+
+People who with _less_ anonymity communicated _more_. But the difference isn't particularly large.
+
+```{r}
+d |> 
+  group_by(persistence, anonymity) |> 
+  summarize(n_Words_m = mean(n_Words)) |> 
+  as.data.frame() |> 
+  kable()
+```
+
+Looking at both groups combined, we see that low anonymity and low persistence created highest participation.
+
+```{r}
+d |> 
+  group_by(group) |> 
+  summarize(
+    anonymity = anonymity[1],
+    persistence = persistence[1],
+    topic = topic[1],
+    n_Words_m = mean(n_Words)
+    ) |> 
+  rmarkdown::paged_table()
+```
+
+Looking at the various individual groups, we do see some difference. Generally, this shows that communication varied across groups.
+
+```{r}
+d |> 
+  group_by(topic) |> 
+  summarize(n_Words_m = mean(n_Words)) |> 
+  as.data.frame() |> 
+  kable()
+```
+
+Looking at topics specifically, we also see that there's some variance.
+
+# Bayesian mixed effects modeling
+
+We analyze the data using Bayesian modelling. 
+
+We use deviation/sum contrast coding (-.1, .1). Meaning, contrasts measure main effects of independent variables.
+
+## Fixed effects 
+
+We preregistered to analyze fixed effects.
+
+```{r fixed-effects-model-1}
+#| message: false
+
+fit_fe_1 <- 
+  hush(
+    brm(
+      n_Words ~ 
+        1 + persistence_dev * anonymity_dev + age + female + pol_stance +
+        (1 | topic/group)
+      , data = d
+      , chains = 4
+      , cores = 4
+      , iter = 6000
+      , warmup = 2000
+      , family = zero_inflated_poisson()
+      , control = list(
+        adapt_delta = .95
+        , max_treedepth = 12
+        )
+      , save_pars = save_pars(all = TRUE)
+      , silent = 2
+      )
+  )
+```
+
+Shows some convergence warnings. Let's inspect model.
+
+```{r fixed-effects-model-1-insp}
+plot(fit_fe_1, ask = FALSE)
+```
+
+Trace-plots look alright.
+
+Let's look at results.
+
+```{r fixed-effects-model-1-sum}
+summary(fit_fe_1)
+```
+
+No significant effect emerged.
+
+Let's inspect ICC
+
+```{r fixed-effects-model-1-icc}
+var_ratio_fe <- performance::variance_decomposition(
+  fit_fe_1
+  , by_group = TRUE)
+var_ratio_fe
+```
+
+`r var_ratio_fe$ICC_decomposed * 100 |> round(0)` percent of variance in words communicated explained by both topics and groups.
+
+Let's visualize results to see what they exactly mean.
+
+```{r fixed-effects-model-1-vis}
+p <- plot(
+  conditional_effects(
+    fit_fe_1
+    ), 
+  ask = FALSE,
+  plot = FALSE
+  )
+
+p_anon <- 
+  p[["anonymity_dev"]] +
+  xlab("Anonymity") +
+  ylab("Words") +
+  scale_x_discrete(
+    limits = rev
+  )
+  #    ) +
+  # scale_y_continuous(
+  #   limits = c(5, 14)
+  #   , breaks = c(6, 8, 10, 12, 14)
+  #   )
+
+p_pers <- 
+  p[["persistence_dev"]] +
+  xlab("Persistence") +
+  ylab("Words") +
+  scale_x_discrete(
+    limits = rev
+   ) +
+  # scale_y_continuous(
+  #   limits = c(5, 14)
+  #   , breaks = c(6, 8, 10, 12, 14)
+  #   ) +
+  theme(
+    axis.title.y = element_blank()
+    )
+
+p_int <- 
+  p[["persistence_dev:anonymity_dev"]] +
+  xlab("Persistence") +
+  scale_x_discrete(
+    limits = rev
+     ) +
+  scale_color_discrete(
+    labels = c("low", "high")
+    ) +
+  guides(
+    fill = "none",
+    color = guide_legend(
+      title = "Anonymity"
+      )
+    ) +
+  # scale_y_continuous(
+  #   limits = c(5, 14)
+  #   , breaks = c(6, 8, 10, 12, 14)
+  #   ) +
+  theme(
+    axis.title.y = element_blank()
+    )
+
+plot <- cowplot::plot_grid(
+  p_anon, p_pers, p_int, 
+  labels = c('A', 'B', "C"), 
+  nrow = 1,
+  rel_widths = c(2, 2, 3)
+  )
+
+plot
+ggsave("figures/results.png", plot, width = 8, height = 4)
+```
+
+Shows that there are no main effects. There seems to be a (nonsignificant) interaction effect. In low persistence environment, anonymity is conducive to communication; in high it's the opposite.
+
+Let's look at posteriors
+
+```{r fixed-effects-model-1-pos}
+p_1 <- 
+  pp_check(fit_fe_1) + 
+  labs(title = "Zero-inflated poisson")
+p_1
+```
+
+The actual distribution cannot be precisely reproduced, but it's also not too far off.
+
+## Random effects
+
+We preregistered to explore and compare models with random effects. So let's model how the experimental conditions affect the outcomes differently depending on topic.
+
+```{r random-effects-model-1}
+#| message: false
+
+fit_re_1 <- 
+  hush(
+    brm(
+      n_Words ~ 
+        1 + persistence_dev * anonymity_dev + age + female + pol_stance +
+        (1 + persistence_dev * anonymity_dev | topic) + 
+        (1 | topic:group)
+      , data = d
+      , chains = 4
+      , cores = 4
+      , iter = 6000
+      , warmup = 2000
+      , family = zero_inflated_poisson()
+      , control = list(
+        adapt_delta = .95
+        , max_treedepth = 15
+        )
+      , save_pars = save_pars(all = TRUE)
+    )
+  )
+```
+
+Shows some convergence warnings.
+
+Let's inspect model.
+
+```{r random-effects-model-1-insp}
+plot(fit_re_1, ask = FALSE)
+```
+
+Traceplots look alright.
+
+Let's look at results.
+
+```{r random-effects-model-1-sum}
+summary(fit_re_1)
+```
+
+Again, no main or interaction effects. 
+
+## Hurdle
+
+Let's now estimate a fixed effects model with hurdles. 
+
+```{r hrdl-model-1-fit}
+#| message: false
+
+fit_hrdl_1 <- 
+  hush(
+    brm(
+      bf(
+        n_Words ~ 
+          1 + persistence_dev * anonymity_dev + age + female + pol_stance +
+          (1 | topic) + 
+          (1 | topic:group),
+        zi ~ 
+          1 + persistence_dev * anonymity_dev + age + female + pol_stance +
+          (1 | topic) + 
+          (1 | topic:group)
+      )
+    , data = d
+    , chains = 4
+    , cores = 4
+    , iter = 6000
+    , warmup = 2000
+    , family = zero_inflated_poisson()
+    , control = list(
+      adapt_delta = .95
+      , max_treedepth = 15
+      )
+    )
+  )
+```
+
+Agian, some warnings.
+
+Let's inspect model.
+
+```{r hrdl-model-1-insp}
+plot(fit_hrdl_1, ask = FALSE)
+```
+
+Trace-plots look alright.
+
+```{r hrdl-model-1-sum}
+summary(fit_hrdl_1)
+```
+
+Same results, no main effects, slightly larger but still nonsignificant interaction effect.
+
+# Exploratory Analyses
+## Frequentist
+
+Look at results from a frequentist perspective.
+
+### Fixed effects
+
+Estimate nested model.
+
+```{r frq-fixed-effects-model-1}
+#| message: false
+
+fit_fe_1_frq <- 
+  lmer(
+    n_Words ~ 
+      1 + 
+      (1 | topic/group) + 
+      persistence_dev * anonymity_dev + age + female + pol_stance
+    , data = d
+    )
+
+summary(fit_fe_1_frq)
+```
+
+Quite weird that topic doesn't get any variance at all. Perhaps due to small cluster size? With Bayesian estimation, it worked alright. Also, again no significant effects.
+
+Estimate without nesting.
+
+```{r frq-fixed-effects-model-2}
+#| message: false
+fit_fe_2_frq <- 
+  lmer(
+    n_Words ~ 
+      1 + 
+      (1 | group) +
+      persistence_dev * anonymity_dev + age + female + pol_stance + topic
+    , data = d
+    )
+
+summary(fit_fe_2_frq)
+```
+
+Also shows no significant effects.
+
+For curiosity, estimate also without hierarchical structure.
+
+```{r frq-fixed-effects-model-3}
+#| message: false
+fit_fe_3_frq <- 
+  lm(
+    n_Words ~ 
+      1 + 
+      persistence_dev * anonymity_dev + topic + age + female + pol_stance
+    , data = d
+    )
+
+summary(fit_fe_3_frq)
+```
+
+Also here, no significant effects.
+
+## Gender
+
+As preregistered, let's see if effects differ across genders.
+
+```{r random-effects-model-gen}
+#| message: false
+
+fit_fe_gen <- 
+  hush(
+    brm(
+      n_Words ~ 
+        1 + persistence_dev * anonymity_dev * gender + age + pol_stance +
+        (1 | topic/group)
+      , data = d
+      , chains = 4
+      , cores = 4
+      , iter = 8000
+      , warmup = 2000
+      , family = zero_inflated_poisson()
+      , control = list(
+        adapt_delta = .95
+        , max_treedepth = 12
+        )
+      )
+  )
+```
+
+Again, some warnings.
+
+Let's inspect model.
+
+```{r random-effects-model-gen-insp}
+plot(fit_fe_gen, ask = FALSE)
+```
+
+Traceplots look alright.
+
+Let's look at results.
+
+```{r random-effects-model-gen-sum}
+summary(fit_fe_gen)
+```
+
+Indeed, several gender effects. 
+
+- For females, the effect of persistence is larger, that is more positive. 
+- For females, the effect of anonymity is smaller, that is more negative. 
+- For females, the interaction effect is also a bit smaller, that is more negative.
+
+Let's visualize results.
+
+```{r fixed-effects-model-gen-vis}
+p_gen <- plot(
+  conditional_effects(
+    fit_fe_gen
+    ), 
+  ask = FALSE,
+  plot = FALSE
+  )
+
+p_gen_pers <- 
+  p_gen[["persistence_dev:gender"]] +
+  xlab("Persistence") +
+  ylab("Words") +
+  # scale_y_continuous(
+  #   limits = c(4, 15),
+  #   breaks = c(5, 7.5, 10, 12.5, 15)
+  # ) +
+  scale_x_discrete(
+    limits = rev
+  ) +
+  guides(
+    fill = "none"
+    , color = "none"
+    )
+
+p_gen_anon <- 
+  p_gen[["anonymity_dev:gender"]] +
+  xlab("Anonymity") +
+  ylab("Words") +
+  # scale_y_continuous(
+  #   limits = c(3.5, 15),
+  #   breaks = c(5, 7.5, 10, 12.5, 15)
+  # ) +
+  theme(
+    axis.title.y = element_blank()
+    ) +
+  guides(
+    fill = "none"
+    ) + 
+  scale_x_discrete(
+    limits = rev
+  ) +
+  scale_color_discrete(
+    name = "Gender"
+    )
+
+plot_gen <- cowplot::plot_grid(
+  p_gen_pers, p_gen_anon, 
+  labels = c('A', 'B'), 
+  nrow = 1,
+  rel_widths = c(4, 5)
+  )
+
+plot_gen
+ggsave("figures/results_gen.png", plot_gen, width = 8, height = 4)
+```
+
+## Benefits
+
+Let's see if benefits differ across experimental groups.
+
+We first look at the experimental group's descriptives
+
+```{r}
+d |> 
+  group_by(persistence) |> 
+  summarize(benefits_m = mean(benefits, na.rm = TRUE)) |> 
+  as.data.frame() |> 
+  kable()
+```
+
+Looking at persistence, we see people with lower persistence reporting slightly higher benefits.
+
+```{r}
+d |> 
+  group_by(anonymity) |> 
+  summarize(benefits_m = mean(benefits, na.rm = TRUE)) |> 
+  as.data.frame() |> 
+  kable()
+```
+
+Looking at anonymity, we see people with low anonymity reporting marginally higher benefits.
+
+```{r}
+d |> 
+  group_by(persistence, anonymity) |> 
+  summarize(benefits_m = mean(benefits, na.rm = T)) |> 
+  as.data.frame() |> 
+  kable()
+```
+
+Looking at both groups combined, we see that low anonymity and low persistence yielded highest benefits.
+
+Let's look if effects are significant.
+
+```{r random-effects-model-1-ben}
+#| message: false
+
+fit_fe_ben_1 <- 
+  hush(
+    brm(
+      benefits ~ 
+        1 + persistence_dev * anonymity_dev  + age + female + pol_stance +
+        (1 | topic/group)
+      , data = d
+      , chains = 4
+      , cores = 4
+      , iter = 6000
+      , warmup = 2000
+      , control = list(
+        adapt_delta = .95
+        , max_treedepth = 12
+        )
+      )
+  )
+```
+
+Let's inspect model.
+
+```{r random-effects-model-1-ben-insp}
+plot(fit_fe_ben_1, ask = FALSE)
+```
+
+Traceplots look alright.
+
+Let's look at results.
+
+```{r random-effects-model-1-ben-sum}
+summary(fit_fe_ben_1)
+```
+
+No significant effects. But note that effect of persistence on perceived benefits only marginally not significant.
+
+## Costs
+
+Let's see if perceived differed across experimental groups.
+
+We first look at the experimental group's descriptives
+
+```{r}
+d |> 
+  group_by(persistence) |> 
+  summarize(costs = mean(costs, na.rm = TRUE)) |> 
+  as.data.frame() |> 
+  kable()
+```
+
+Looking at persistence, we see both groups report equal costs.
+
+```{r}
+d |> 
+  group_by(anonymity) |> 
+  summarize(costs = mean(costs, na.rm = TRUE)) |> 
+  as.data.frame() |> 
+  kable()
+```
+
+Looking at anonymity, we see people with low anonymity report slightly higher costs.
+
+```{r}
+d |> 
+  group_by(persistence, anonymity) |> 
+  summarize(costs = mean(costs, na.rm = TRUE)) |> 
+  as.data.frame() |> 
+  kable()
+```
+
+Looking at both groups combined, we see that highest costs were reported by group with low anonymity and low persistence.
+
+Let's look if effects are significant.
+
+```{r random-effects-model-1-ris}
+#| message: false
+
+fit_fe_costs_1 <- 
+  hush(
+    brm(
+      costs ~ 
+        1 + persistence_dev * anonymity_dev + age + female + pol_stance +
+        (1 | topic/group)
+      , data = d
+      , chains = 4
+      , cores = 4
+      , iter = 8000
+      , warmup = 2000
+      , control = list(
+        adapt_delta = .95
+        , max_treedepth = 12
+        )
+      )
+  )
+```
+
+Let's inspect model.
+
+```{r random-effects-model-1-ris-insp}
+plot(fit_fe_costs_1, ask = FALSE)
+```
+
+Traceplots look alright.
+
+Let's look at results.
+
+```{r random-effects-model-1-ris-sum}
+summary(fit_fe_costs_1)
+```
+
+We find that anonymity does reduce costs.
+
+## Mediation
+
+Let's see if perceived benefits and costs were associated with increased words communicated.
+
+```{r fixed-effects-model-med}
+#| message: false
+
+fit_fe_med <- 
+  hush(
+    brm(
+      n_Words ~ 
+        1 + persistence_dev * anonymity_dev + benefits + costs  + age + female + pol_stance + 
+        (1 | topic/group)
+      , data = d
+      , chains = 4
+      , cores = 4
+      , iter = 6000
+      , warmup = 2000
+      , family = zero_inflated_poisson()
+      , control = list(
+        adapt_delta = .95
+        , max_treedepth = 12
+        )
+      )
+  )
+```
+
+Let's look at results.
+
+```{r fixed-effects-model-med-sum}
+summary(fit_fe_med)
+```
+
+We find that increased perceived costs are associated with decreased words communicated. Increased benefits are associated with increased words communicated. Let's check if overall effect is significant.
+
+```{r}
+anon_costs_a_b <- fixef(fit_fe_costs_1)["anonymity_dev1", "Estimate"]
+anon_costs_a_se <- fixef(fit_fe_costs_1)["anonymity_dev1", "Est.Error"]
+anon_costs_a_dis <- rnorm(10000, anon_costs_a_b, anon_costs_a_se)
+
+anon_costs_b_b <- fixef(fit_fe_med)["benefits", "Estimate"]
+anon_costs_b_se <- fixef(fit_fe_med)["benefits", "Est.Error"]
+anon_costs_b_dis <- rnorm(10000, anon_costs_b_b, anon_costs_b_se)
+
+anon_costs_ab_dis <- anon_costs_a_dis * anon_costs_b_dis
+anon_costs_ab_m <- median(anon_costs_ab_dis)
+anon_costs_ab_ll <- quantile(anon_costs_ab_dis, .025)
+anon_costs_ab_ul <- quantile(anon_costs_ab_dis, .975)
+```
+
+The effect is significant (_b_ = `r anon_costs_ab_m |> round(2)`, 95% MC CI [`r anon_costs_ab_ll |> round(2)`, `r anon_costs_ab_ul |> round(2)`]).
+
+# Save
+
+```{r sage-image}
+save.image("data/image_words.RData")
+```
+

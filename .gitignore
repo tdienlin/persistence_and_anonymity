@@ -3,7 +3,15 @@
 .RData
 .Ruserdata
 .DS_Store
-power analysis/archive/
-power analysis/README_cache/
-Hintergrund/
 archive/
+power_analysis_cache/
+analysis_preregistered_cache/
+site_libs/.DS_Store
+analyses_cache/
+*_cache/
+data/*
+!data/
+!data/data.csv
+!data/data_simulated.csv
+/.quarto/
+lyses.html

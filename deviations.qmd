@@ -1,0 +1,12 @@
+---
+title: "Deviations from Preregistration"
+---
+
+- We decided to not exclude people who missed the questionnaire at T2, as participation wasn’t necessary for our analyses and would have only led to unnecessary dropouts.
+- We originally preregistered to have crossed multilevel structure, when in reality the structure is nested (groups are nested in topics). 
+- We initially didn't include control variables. However, including pre-treatment control variables improves parameter estimation (see Gelman, A., Hill, J., & Vehtari, A. (2020). Regression and other stories (1st ed.). Cambridge University Press. https://doi.org/10.1017/978113916187), which is why we decided to include it.
+- Together, We hence corrected this as follows:
+    - Preregistered: expressions ~ 1 + persistence * anonymity + (1 | topic) + (1 | group)
+    - Updated: expressions ~ 1 + age + female + pol_stance + persistence * anonymity + (1 | topic/group)
+- We originally planned to use default (flat) priors (chains = 2, iterations = 2,000, warm-up = 1,000). However, to improve convergence, we increased chains, iterations, and warm-ups.
+- We originally planned to conduct multiple imputation. However, because for the central analyses there were no missing data, this wasn't necessary
