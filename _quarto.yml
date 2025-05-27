@@ -21,10 +21,10 @@ website:
     right:
       - text: "Source Code"
         icon: fa-github
-        href: https://github.com/XMtRa/privacy_calc_exp_anon
+        href: https://github.com/tdienlin/privacy_calc_exp_anon
       - text: "Data"
         icon: fa-database
-        href: https://github.com/XMtRa/persistence_anonymity_anon/blob/main/data/data.csv
+        href: https://github.com/tdienlin/persistence_anonymity_anon/blob/main/data/data.csv
 
 format:
   html:

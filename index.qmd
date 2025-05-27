@@ -13,4 +13,4 @@ You can find the following information here:
 - [Planned analyses](planned_analyses.html)
 - [Deviations from preregistration](deviations.html)
 
-This website is produced directly from the project's [github repository](https://github.com/XMtRa/persistence_anonymity_anon). You can download the material and the data, file an issue, or submit a pull request.
+This website is produced directly from the project's [github repository](https://github.com/tdienlin/persistence_anonymity_anon). You can download the material and the data, file an issue, or submit a pull request.
